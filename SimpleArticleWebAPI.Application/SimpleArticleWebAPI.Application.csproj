@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\SimpleArticleWebAPI.Domain\SimpleArticleWebAPI.Domain.csproj" />
     <ProjectReference Include="..\SimpleArticleWebAPI.Persistence\SimpleArticleWebAPI.Persistence.csproj" />
   </ItemGroup>

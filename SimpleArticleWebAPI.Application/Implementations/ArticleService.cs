@@ -1,4 +1,6 @@
-﻿using SimpleArticleWebAPI.Application.DTOs;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using SimpleArticleWebAPI.Application.DTOs;
 using SimpleArticleWebAPI.Application.Interface;
 using SimpleArticleWebAPI.Domain;
 using SimpleArticleWebAPI.Persistence;
@@ -15,53 +17,59 @@ namespace SimpleArticleWebAPI.Application.Implementations
 	public class ArticleService : IArticleService
 	{
 		private readonly AppDbContext _context;
-		public ArticleService(AppDbContext context)
+		private readonly IMemoryCache _memoryCache;
+		public ArticleService(AppDbContext context, IMemoryCache memoryCache)
 		{
 			_context = context;
+			_memoryCache = memoryCache;
 		}
 
-		public async Task<string> GetAriclesFromAPI()
+		public async Task<List<Articlee>> GetArticles()
 		{
-			var client = new HttpClient();
-			
-			var url = "https://api.wikimedia.org/feed/v1/wikipedia/en/featured/2023/09/22";
-			var response = await client.GetAsync(url);
+			// check if articles are in cache, if yes retrieve from there
+			var articles = await GetArticlesFromSources();
+			return articles;
+			// else retrieve from DB
+		}
 
-			if (response.IsSuccessStatusCode)
+		private async Task<List<Articlee>> GetArticlesFromSources()
+		{
+			if (_memoryCache.TryGetValue("ArticlesKey", out List<Articlee> cachedArticles))
 			{
-				var content = await response.Content.ReadAsStringAsync();
-				var data = JsonSerializer.Deserialize<GetFeaturedArticleDTO>(content);
-
-				if (data == null)
-				{
-					return "no avalable articles for the day";
-				}
-
-				SaveArticles(data);
-
-				return "articles";
+				// Articles found in cache, return them
+				//_logger.LogInformation("Articles found in cache. Total count: {Count}", cachedArticles.Count);
+				return cachedArticles;
 			}
 			else
 			{
-				// return 500 internal server
+				// No products found in cache, return an empty list
+				// Product not found in cache, fetch it from the source
+				//_logger.LogInformation("Product not found in cache. Fetching from the data source.");
+
+				// Replace this with code to retrieve the product from your data source
+				// For example, you might use a service or database query to get the product
+
+				var articles = await GetArticlesFromDB(); // Replace with actual code
+				if (articles != null && articles.Any())
+				{
+					// Cache the retrieved articles for future use
+					var cacheEntryOptions = new MemoryCacheEntryOptions
+					{
+						AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10) // Cache for 10 minutes
+					};
+
+					_memoryCache.Set("ArticlesKey", articles, cacheEntryOptions);
+				}
+
+				return articles ?? new List<Articlee>(); // Return the retrieved articles or an empty list if none found
+
 			}
-
-
-			throw new NotImplementedException();
 		}
 
-		private void SaveArticles(GetFeaturedArticleDTO getArticle)
+		private async Task<List<Articlee>> GetArticlesFromDB()
 		{
-			var article = new Articlee
-			{
-				DateProcessed = DateTime.Now,
-				Title = getArticle.tfa.title,
-				FirstParagraph = getArticle.tfa.extract
-			};
-
-			_context.Add(article);
-			_context.SaveChanges();
+			var articles = await _context.Articlees.ToListAsync();
+			return articles;
 		}
-
 	}
 }

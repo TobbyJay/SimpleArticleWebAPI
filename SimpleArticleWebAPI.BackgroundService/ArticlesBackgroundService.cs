@@ -19,9 +19,11 @@ namespace SimpleArticleWebAPI.BackgroundJob
 	public class ArticlesBackgroundService : BackgroundService
 	{
 		private readonly IServiceProvider _serviceProvider;
-		public ArticlesBackgroundService(IServiceProvider serviceProvider)
+		private readonly IMemoryCache _memoryCache;
+		public ArticlesBackgroundService(IServiceProvider serviceProvider, IMemoryCache memoryCache)
 		{
 			_serviceProvider = serviceProvider;
+			_memoryCache = memoryCache;
 		}
 		protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 		{
@@ -40,10 +42,9 @@ namespace SimpleArticleWebAPI.BackgroundJob
 				using (var scope = _serviceProvider.CreateAsyncScope())
 				{
 					var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-					var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
 					var _configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
-					await FetchTodaysFeaturedArticleFromWikipedia(cache, dbContext, _configuration, formatTime);
+					await FetchTodaysFeaturedArticleFromWikipedia(dbContext, _configuration, formatTime);
 				}
 				
 				//await Task.Delay(delay, stoppingToken);
@@ -52,7 +53,7 @@ namespace SimpleArticleWebAPI.BackgroundJob
 			throw new NotImplementedException();
 		}
 
-		private async Task FetchTodaysFeaturedArticleFromWikipedia(IMemoryCache cache, AppDbContext context,IConfiguration configuration, string date)
+		private async Task FetchTodaysFeaturedArticleFromWikipedia(AppDbContext context,IConfiguration configuration, string date)
 		{
 			var client = new HttpClient();
 
@@ -71,7 +72,7 @@ namespace SimpleArticleWebAPI.BackgroundJob
 					// log here "no avalable articles for the day";
 				}
 
-				SaveArticle(data, context, cache);
+				SaveArticle(data, context);
 				 // log here "Features article for the day saved";
 			}
 			else
@@ -79,7 +80,7 @@ namespace SimpleArticleWebAPI.BackgroundJob
 				// return 500 internal server
 			}
 		}
-		private void SaveArticle(GetFeaturedArticleDTO getArticle, AppDbContext _context, IMemoryCache cache)
+		private void SaveArticle(GetFeaturedArticleDTO getArticle, AppDbContext _context)
 		{
 			var modifiedParagraph = FindAndModifyConcepts(getArticle.tfa.extract);
 
@@ -87,7 +88,7 @@ namespace SimpleArticleWebAPI.BackgroundJob
 			{
 				DateProcessed = DateTime.Now,
 				Title = getArticle.tfa.title,
-				FirstParagraph = getArticle.tfa.extract,
+				FirstParagraph = getArticle.tfa.extract_html,
 				ModifiedParagraph = modifiedParagraph
 			};
 
@@ -96,7 +97,7 @@ namespace SimpleArticleWebAPI.BackgroundJob
 			_context.SaveChanges();
 
 			// save to cache
-			SaveToCache(article,cache);
+			SaveToCache(article);
 		}
 
 		public static string FindAndModifyConcepts(string text)
@@ -136,25 +137,22 @@ namespace SimpleArticleWebAPI.BackgroundJob
 			return modifiedParagraph;
 		}
 
-		private void SaveToCache(Articlee article, IMemoryCache cache)
+		private void SaveToCache(Articlee article)
 		{
 			// Retrieve the existing list of articles from the cache, or create a new list if it doesn't exist
-			var cachedArticles = cache.TryGetValue("ArticlesKey", out List<Articlee> existingArticles)
+			var cachedArticles = _memoryCache.TryGetValue("ArticlesKey", out List<Articlee> existingArticles)
 				? existingArticles
 				: new List<Articlee>();
 
-			// Add the new product to the list
+			// Add the new article to the list
 			cachedArticles.Add(article);
 
-			var cacheEntryOptions = new MemoryCacheEntryOptions
-			{
-				AbsoluteExpirationRelativeToNow = null
-			};
+			// Save the updated list of articles back to the cache without setting an expiration time
+			_memoryCache.Set("ArticlesKey", cachedArticles);
 
-			// Save the updated list of products back to the cache
-			cache.Set("ArticlesKey", article, cacheEntryOptions);
-
-			//_logger.LogInformation("Product saved to cache.");
+			// Optionally log that the article was saved to the cache
+			//_logger.LogInformation("Article saved to cache.");
 		}
+
 	}
 }
