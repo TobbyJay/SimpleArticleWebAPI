@@ -37,18 +37,20 @@ namespace SimpleArticleWebAPI.Application.Implementations
 					return "no avalable articles for the day";
 				}
 
-				SaveArticle(data);
-				return "Features article for the day saved";
+				SaveArticles(data);
+
+				return "articles";
 			}
 			else
 			{
 				// return 500 internal server
 			}
 
+
 			throw new NotImplementedException();
 		}
 
-		private void SaveArticle(GetFeaturedArticleDTO getArticle)
+		private void SaveArticles(GetFeaturedArticleDTO getArticle)
 		{
 			var article = new Articlee
 			{
@@ -60,5 +62,6 @@ namespace SimpleArticleWebAPI.Application.Implementations
 			_context.Add(article);
 			_context.SaveChanges();
 		}
+
 	}
 }

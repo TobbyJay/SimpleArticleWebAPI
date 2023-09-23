@@ -10,6 +10,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.RegisterSQLDbContext(builder.Configuration);
 builder.Services.RegisterServices();
+builder.Services.AddMemoryCache();
+builder.Services.RegisterBackgroundService();
 
 var app = builder.Build();
 
