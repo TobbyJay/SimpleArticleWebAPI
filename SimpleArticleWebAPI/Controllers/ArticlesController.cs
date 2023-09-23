@@ -14,10 +14,10 @@ namespace SimpleArticleWebAPI.Controllers
 			_articleService = articleService;
 		}
 
-		[HttpGet("GetTodaysFeaturedArticles")]
-		public async Task<IActionResult> GetTodaysFeaturedArticles()
+		[HttpGet("GetAllArticles")]
+		public async Task<IActionResult> GetAllArticles()
 		{
-			var getArticlesAndSaveToDB = await _articleService.GetAriclesFromAPI();
+			var getArticlesAndSaveToDB = await _articleService.GetArticles();
 			return Ok(getArticlesAndSaveToDB);
 		}
 	}

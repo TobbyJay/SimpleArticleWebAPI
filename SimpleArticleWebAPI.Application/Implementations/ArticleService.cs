@@ -1,4 +1,7 @@
-﻿using SimpleArticleWebAPI.Application.DTOs;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
+using SimpleArticleWebAPI.Application.DTOs;
 using SimpleArticleWebAPI.Application.Interface;
 using SimpleArticleWebAPI.Domain;
 using SimpleArticleWebAPI.Persistence;
@@ -15,50 +18,54 @@ namespace SimpleArticleWebAPI.Application.Implementations
 	public class ArticleService : IArticleService
 	{
 		private readonly AppDbContext _context;
-		public ArticleService(AppDbContext context)
+		private readonly IMemoryCache _memoryCache;
+		private readonly ILogger<ArticleService> _logger;
+		public ArticleService(AppDbContext context, IMemoryCache memoryCache, ILogger<ArticleService> logger)
 		{
 			_context = context;
+			_memoryCache = memoryCache;
+			_logger = logger;
 		}
 
-		public async Task<string> GetAriclesFromAPI()
+		public async Task<List<Articlee>> GetArticles()
 		{
-			var client = new HttpClient();
-			
-			var url = "https://api.wikimedia.org/feed/v1/wikipedia/en/featured/2023/09/22";
-			var response = await client.GetAsync(url);
+			var articles = await GetArticlesFromSources();
+			return articles;
+		}
 
-			if (response.IsSuccessStatusCode)
+		private async Task<List<Articlee>> GetArticlesFromSources()
+		{
+			if (_memoryCache.TryGetValue("ArticlesKey", out List<Articlee> cachedArticles))
 			{
-				var content = await response.Content.ReadAsStringAsync();
-				var data = JsonSerializer.Deserialize<GetFeaturedArticleDTO>(content);
-
-				if (data == null)
-				{
-					return "no avalable articles for the day";
-				}
-
-				SaveArticle(data);
-				return "Features article for the day saved";
+				// Articles found in cache, return them
+				_logger.LogInformation("Articles found in cache. Total count: {Count}", cachedArticles.Count);
+				return cachedArticles;
 			}
 			else
 			{
-				// return 500 internal server
-			}
 
-			throw new NotImplementedException();
+				_logger.LogInformation("Articles not found in cache. Fetching from the database.");
+
+				var articles = await GetArticlesFromDB(); 
+				if (articles != null && articles.Any())
+				{
+					// Cache the retrieved articles for future use
+					var cacheEntryOptions = new MemoryCacheEntryOptions
+					{
+						AbsoluteExpirationRelativeToNow = null 
+					};
+
+					_memoryCache.Set("ArticlesKey", articles, cacheEntryOptions);
+				}
+
+				return articles ?? new List<Articlee>(); 
+			}
 		}
 
-		private void SaveArticle(GetFeaturedArticleDTO getArticle)
+		private async Task<List<Articlee>> GetArticlesFromDB()
 		{
-			var article = new Articlee
-			{
-				DateProcessed = DateTime.Now,
-				Title = getArticle.tfa.title,
-				FirstParagraph = getArticle.tfa.extract
-			};
-
-			_context.Add(article);
-			_context.SaveChanges();
+			var articles = await _context.Articlees.ToListAsync();
+			return articles;
 		}
 	}
 }

@@ -11,6 +11,7 @@ namespace SimpleArticleWebAPI.Domain
         public Guid ArticleeId { get; set; }
         public string? Title { get; set; }
         public string? FirstParagraph { get; set; }
+        public string? ModifiedParagraph { get; set; }
         public DateTime DateProcessed { get; set; }
     }
 }

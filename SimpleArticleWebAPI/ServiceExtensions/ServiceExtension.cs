@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using SimpleArticleWebAPI.Application.Implementations;
 using SimpleArticleWebAPI.Application.Interface;
+using SimpleArticleWebAPI.BackgroundJob;
 using SimpleArticleWebAPI.Persistence;
 
 namespace SimpleArticleWebAPI.ServiceExtensions
@@ -17,6 +18,12 @@ namespace SimpleArticleWebAPI.ServiceExtensions
 		public static void RegisterServices(this IServiceCollection service)
 		{
 			service.AddScoped<IArticleService, ArticleService>();
+		}
+		
+		public static IServiceCollection RegisterBackgroundService(this IServiceCollection service)
+		{
+			service.AddHostedService<ArticlesBackgroundService>();
+			return service;
 		}
 	}
 }

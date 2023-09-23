@@ -10,6 +10,6 @@ namespace SimpleArticleWebAPI.Application.Interface
 	public interface IArticleService
 	{
 		//public void SaveArticles(Article article);
-		public Task<string> GetAriclesFromAPI();
+	    Task<List<Articlee>> GetArticles();
     }
 }
