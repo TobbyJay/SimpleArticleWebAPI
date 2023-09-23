@@ -53,8 +53,7 @@ namespace SimpleArticleWebAPI.BackgroundJob
 					await FetchTodaysFeaturedArticleFromWikipedia(dbContext, _configuration, formatTime);
 				}
 				
-				//await Task.Delay(delay, stoppingToken);
-				await Task.Delay(TimeSpan.FromMinutes(2), stoppingToken);
+				await Task.Delay(delay, stoppingToken);
 			}
 			throw new NotImplementedException();
 		}
