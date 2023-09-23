@@ -17,7 +17,7 @@ namespace SimpleArticleWebAPI.Controllers
 		[HttpGet("GetTodaysFeaturedArticles")]
 		public async Task<IActionResult> GetTodaysFeaturedArticles()
 		{
-			var getArticlesAndSaveToDB = await _articleService.GetAriclesFromAPI();
+			var getArticlesAndSaveToDB = _articleService.GetAriclesFromAPI();
 			return Ok(getArticlesAndSaveToDB);
 		}
 	}
