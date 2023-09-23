@@ -3,7 +3,9 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using SimpleArticleWebAPI.Application.DTOs;
+using SimpleArticleWebAPI.Application.Implementations;
 using SimpleArticleWebAPI.Domain;
 using SimpleArticleWebAPI.Persistence;
 using System;
@@ -20,10 +22,14 @@ namespace SimpleArticleWebAPI.BackgroundJob
 	{
 		private readonly IServiceProvider _serviceProvider;
 		private readonly IMemoryCache _memoryCache;
-		public ArticlesBackgroundService(IServiceProvider serviceProvider, IMemoryCache memoryCache)
+		private readonly ILogger<ArticlesBackgroundService> _logger;
+		public ArticlesBackgroundService(IServiceProvider serviceProvider,
+			IMemoryCache memoryCache,
+			ILogger<ArticlesBackgroundService> logger)
 		{
 			_serviceProvider = serviceProvider;
 			_memoryCache = memoryCache;
+			_logger = logger;
 		}
 		protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 		{
@@ -52,33 +58,39 @@ namespace SimpleArticleWebAPI.BackgroundJob
 			}
 			throw new NotImplementedException();
 		}
-
 		private async Task FetchTodaysFeaturedArticleFromWikipedia(AppDbContext context,IConfiguration configuration, string date)
 		{
-			var client = new HttpClient();
-
-			var baseUrl = configuration["FeaturedArticleUrl"];
-			var url = $"{baseUrl}{date}";
-
-			var response = await client.GetAsync(url);
-
-			if (response.IsSuccessStatusCode)
+			try
 			{
-				var content = await response.Content.ReadAsStringAsync();
-				var data = JsonSerializer.Deserialize<GetFeaturedArticleDTO>(content);
+				var client = new HttpClient();
 
-				if (data == null)
+				var baseUrl = configuration["FeaturedArticleUrl"];
+				var url = $"{baseUrl}{date}";
+
+				var response = await client.GetAsync(url);
+
+				if (response.IsSuccessStatusCode)
 				{
-					// log here "no avalable articles for the day";
-				}
+					var content = await response.Content.ReadAsStringAsync();
+					var data = JsonSerializer.Deserialize<GetFeaturedArticleDTO>(content);
 
-				SaveArticle(data, context);
-				 // log here "Features article for the day saved";
+					if (data == null)
+					{
+						_logger.LogInformation("No avalable articles for the day");
+					}
+
+					SaveArticle(data, context);
+					_logger.LogInformation("Features article for the day saved");
+				}
+				else
+				{
+					_logger.LogInformation("Request to get articles not successful, please try again");
+				}
 			}
-			else
+			catch (Exception ex)
 			{
-				// return 500 internal server
-			}
+				_logger.LogInformation("An error occured: {@ex.Message}", ex.Message);
+			}		
 		}
 		private void SaveArticle(GetFeaturedArticleDTO getArticle, AppDbContext _context)
 		{
@@ -96,17 +108,15 @@ namespace SimpleArticleWebAPI.BackgroundJob
 			_context.Add(article);
 			_context.SaveChanges();
 
-			// save to cache
 			SaveToCache(article);
 		}
-
 		public static string FindAndModifyConcepts(string text)
 		{
 			// Split the text into words using various delimiters (space, comma, period, and so on)
 
 			string[] words = text.Split(new[] { ' ', ',', '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
 
-			// Define a regular expression pattern to match capitalized words ( my assumption is that wikipedia sets concepts as starting with an UppserCase )
+			// Define a regular expression pattern to match capitalized words ( i notice that wikipedia sets concepts as starting with an UpperCase (Theatre) for instance )
 			string pattern = @"(\b[A-Z][a-z]*\b)";
 
 			StringBuilder modifiedText = new StringBuilder(text);
@@ -124,19 +134,17 @@ namespace SimpleArticleWebAPI.BackgroundJob
 					modifiedText.Replace(concept, modifiedConcept);
 				}
 			}
-			// After modifying the text, remove any consecutive "frigging" occurrences ( my algorithm returns double friggings.
+			// After modifying the text, remove any consecutive "frigging" occurrences ( my algorithm returns double friggings. )
 			return RemoveDoubleFriggings(modifiedText.ToString());
 		}
 		public static string RemoveDoubleFriggings(string paragraph)
 		{
-			// Define a regular expression pattern to match consecutive "frigging" words
 			string pattern = @"\bfrigging frigging\b";
 
 			string modifiedParagraph = Regex.Replace(paragraph, pattern, "frigging");
 
 			return modifiedParagraph;
 		}
-
 		private void SaveToCache(Articlee article)
 		{
 			// Retrieve the existing list of articles from the cache, or create a new list if it doesn't exist
@@ -150,9 +158,7 @@ namespace SimpleArticleWebAPI.BackgroundJob
 			// Save the updated list of articles back to the cache without setting an expiration time
 			_memoryCache.Set("ArticlesKey", cachedArticles);
 
-			// Optionally log that the article was saved to the cache
-			//_logger.LogInformation("Article saved to cache.");
+			_logger.LogInformation("Article saved to cache.");
 		}
-
 	}
 }

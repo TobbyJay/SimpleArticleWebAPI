@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using SimpleArticleWebAPI.Application.DTOs;
 using SimpleArticleWebAPI.Application.Interface;
 using SimpleArticleWebAPI.Domain;
@@ -18,18 +19,18 @@ namespace SimpleArticleWebAPI.Application.Implementations
 	{
 		private readonly AppDbContext _context;
 		private readonly IMemoryCache _memoryCache;
-		public ArticleService(AppDbContext context, IMemoryCache memoryCache)
+		private readonly ILogger<ArticleService> _logger;
+		public ArticleService(AppDbContext context, IMemoryCache memoryCache, ILogger<ArticleService> logger)
 		{
 			_context = context;
 			_memoryCache = memoryCache;
+			_logger = logger;
 		}
 
 		public async Task<List<Articlee>> GetArticles()
 		{
-			// check if articles are in cache, if yes retrieve from there
 			var articles = await GetArticlesFromSources();
 			return articles;
-			// else retrieve from DB
 		}
 
 		private async Task<List<Articlee>> GetArticlesFromSources()
@@ -37,32 +38,27 @@ namespace SimpleArticleWebAPI.Application.Implementations
 			if (_memoryCache.TryGetValue("ArticlesKey", out List<Articlee> cachedArticles))
 			{
 				// Articles found in cache, return them
-				//_logger.LogInformation("Articles found in cache. Total count: {Count}", cachedArticles.Count);
+				_logger.LogInformation("Articles found in cache. Total count: {Count}", cachedArticles.Count);
 				return cachedArticles;
 			}
 			else
 			{
-				// No products found in cache, return an empty list
-				// Product not found in cache, fetch it from the source
-				//_logger.LogInformation("Product not found in cache. Fetching from the data source.");
 
-				// Replace this with code to retrieve the product from your data source
-				// For example, you might use a service or database query to get the product
+				_logger.LogInformation("Articles not found in cache. Fetching from the database.");
 
-				var articles = await GetArticlesFromDB(); // Replace with actual code
+				var articles = await GetArticlesFromDB(); 
 				if (articles != null && articles.Any())
 				{
 					// Cache the retrieved articles for future use
 					var cacheEntryOptions = new MemoryCacheEntryOptions
 					{
-						AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10) // Cache for 10 minutes
+						AbsoluteExpirationRelativeToNow = null 
 					};
 
 					_memoryCache.Set("ArticlesKey", articles, cacheEntryOptions);
 				}
 
-				return articles ?? new List<Articlee>(); // Return the retrieved articles or an empty list if none found
-
+				return articles ?? new List<Articlee>(); 
 			}
 		}
 
